@@ -18,6 +18,14 @@ RUN mkdir /build && \
 WORKDIR /build/src
 
 
+FROM base AS build-stage
+COPY . /build/src
+RUN ["latexmk", "-pdf", "-output-directory=../out", "-Werror"]
+
+FROM scratch AS export-stage
+COPY --from=build-stage /build/out/main.pdf /
+
+
 FROM base AS development-environment
 
 ARG uid=1000
