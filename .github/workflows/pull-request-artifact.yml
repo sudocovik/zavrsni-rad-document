@@ -1,0 +1,54 @@
+name: Build & deploy artifact
+
+on:
+  pull_request:
+    branches: [ main ]
+
+env:
+  FILE_NAME: ${{ github.sha }}.pdf
+  REMOTE_PATH: pull-request-${{ github.event.pull_request.number }}
+
+jobs:
+  build-upload-comment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Create artificat (compile LaTeX to PDF)
+        run: make
+
+      - name: Rename artifact file name
+        working-directory: ./out
+        run: mv main.pdf ${{ env.FILE_NAME }}
+
+      - name: Upload artifact to DigitalOcean Spaces
+        uses: BetaHuhn/do-spaces-action@v2
+        id: spaces
+        with:
+          access_key: ${{ secrets.SPACES_ACCESS_KEY }}
+          secret_key: ${{ secrets.SPACES_SECRET_KEY }}
+          space_name: zavrsni-rad
+          space_region: fra1
+          source: ./out/${{ env.FILE_NAME }}
+          out_dir: ${{ env.REMOTE_PATH }}
+          permission: public-read
+
+      - name: Raise comment with a link to artifact
+        uses: actions/github-script@0.9.0
+        if: success()
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `
+              [Download PDF](${{ steps.spaces.outputs.output_url }}/${{ env.FILE_NAME }})
+              Based on commit ${{ github.sha }}
+            `;
+
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
