@@ -80,3 +80,17 @@ kako bi ga mogli koristiti.
 \textit{Service} predstavlja apstrakciju nad kontejnerima i ponaša se kao balanser opterećenja (u slučaju više replika)
 ili \textit{proxy} (u slučaju jedne replike).
 
+Pozadinska aplikacija je slična grafičkom sučelju osim što ovisi o bazi podataka.
+Ovisi o \textit{Service} komponenti baze podataka kao i pristupnim podacima koji se nalaze u komponenti \textit{Secret}.
+Kako bi pozadinska aplikacija komunicirala s bazom podataka potrebno je nekoliko podataka:
+\begin{itemize}
+    \item Adresa
+    \item Korisničko ime
+    \item Lozinka
+    \item Naziv baze podataka
+\end{itemize}
+
+Kako je već rečeno da je \textit{Service} apstrakcija nad kontejnerima tako je sam naziv servisa ujedno i \textbf{adresa}.
+\textbf{Korisničko ime}, \textbf{lozinka} i \textbf{naziv baze podataka} se nalaze u \textit{Secret} komponenti.
+Ona predstavlja jedini izvor točnosti (eng. \textit{single source of truth}) pa ukoliko dođe do promjena
+u podacima pozadinska aplikacija i baza podataka mogu pravilno reagirati kako bi nesmetano funkcionirali.
