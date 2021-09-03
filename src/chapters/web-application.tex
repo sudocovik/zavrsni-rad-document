@@ -72,3 +72,11 @@ To omogućava lakše razumijevanje komponenti sustava kao i vizualizaciju istih.
 Na slici~\ref{fig:application-infrastructure} je prikazan \textit{cluster} sa svim servisima i komponentama.
 Početna točka je \textit{ingress} koji funkcionira kao \textit{proxy}.
 Ovisno o putanji koju korisnik zahtjeva, zahtjev se prosljeđuje na \textit{backend} (pozadinska aplikacija) ili \textit{frontend} (grafičko sučelje).
+
+Grafičko sučelje se sastoji od dvije komponente: \textit{Service} i \textit{Deployment}.
+\textit{Deployment} zna kako pokrenuti kontejner, kad je kontejner spreman za obradu zahtjeva i koliko replika ima.
+Kako svaki kontejner ima svoju IP adresu ostali servisi bi morali znati točnu IP adresu kontejnera
+kako bi ga mogli koristiti.
+\textit{Service} predstavlja apstrakciju nad kontejnerima i ponaša se kao balanser opterećenja (u slučaju više replika)
+ili \textit{proxy} (u slučaju jedne replike).
+
