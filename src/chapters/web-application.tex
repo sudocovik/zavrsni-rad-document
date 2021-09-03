@@ -94,3 +94,14 @@ Kako je već rečeno da je \textit{Service} apstrakcija nad kontejnerima tako je
 \textbf{Korisničko ime}, \textbf{lozinka} i \textbf{naziv baze podataka} se nalaze u \textit{Secret} komponenti.
 Ona predstavlja jedini izvor točnosti (eng. \textit{single source of truth}) pa ukoliko dođe do promjena
 u podacima pozadinska aplikacija i baza podataka mogu pravilno reagirati kako bi nesmetano funkcionirali.
+
+Baza podataka, naspram pozadinske aplikacije, ima jednu komponentu više: \textit{Persistent Volume Claim}.
+Svaki kontejner ima sustav datoteka odvojen od domaćinovog sustava datoteka (eng. \textit{host file system}).
+U slučaju zaustavljanja kontejnera (namjerno ili uslijed greške) svi podaci bi bili trajno izgubljeni.
+Kako bi se to izbjeglo potrebno je dozvoliti kontejneru pisanje u domaćinov sustav datoteka.
+Komponenta \textit{Persistent Volume Claim} apstrahira ovu funkcionalnost pa sam kontejner uopće ne zna da se podaci zapravo
+zapisuju na domaćinov sustav datoteka.
+To omogućava djelomično fizičko odvajanje domaćinovog sustava datoteka.
+Direktoriji koji su potrebni bazi podataka su odvojeni na vanjsku pohranu (slika~\ref{fig:physical-infrastructure}) dok su
+podaci i datoteke o kojima ovisi operacijski sustav pohranjeni na internu pohranu servera.
+U slučaju nepovratnog pada servera (npr.~fizičko oštećenje) zamjenom servera sustav nastavlja raditi bez gubitka podataka.
