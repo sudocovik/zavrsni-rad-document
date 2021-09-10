@@ -53,7 +53,9 @@ unicode
     extendedchars=false,
     inputencoding=utf8,
     basicstyle=\footnotesize\ttfamily,
-    breaklines=true
+    breaklines=true,
+    showspaces=false,
+    showstringspaces=false
 }
 
 % Promjena iz Times u Sans font
