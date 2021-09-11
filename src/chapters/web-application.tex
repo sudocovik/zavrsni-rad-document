@@ -107,16 +107,5 @@ podaci i datoteke o kojima ovisi operacijski sustav pohranjeni na internu pohran
 U slučaju nepovratnog pada servera (npr.~fizičko oštećenje) zamjenom servera sustav nastavlja raditi bez gubitka podataka.
 
 \section{Pozadinska aplikacija}
+\input{sections/web-application/backend-application}
 
-Pozadinska aplikacija definira većinski dio logike sustava.
-Svoje funkcionalnosti daje na korištenje kroz REST API kako bi grafičko sučelje i sef mogli ispunjavati svoje uloge.
-Funkcionalnosti su sljedeće:
-
-\begin{itemize}
-    \item Upravljanje karticama
-    \item Autorizacija kartica
-    \item Pregled evidencije (ne)autoriziranih kartica
-    \item Autorizacija korisnika
-\end{itemize}
-
-Funkcionalnosti su implementirane u programskom jeziku \textit{PHP} uz pomoć \textit{Laravel} radnog okvira.
