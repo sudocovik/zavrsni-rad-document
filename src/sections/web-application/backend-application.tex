@@ -455,3 +455,70 @@ Kako korisnik može izmjenjivati i brisati kartice, nakon bilo koje akcije bilo 
 pristupa što generira nepotreban mrežni promet.
 S obzirom da je logika povezivanja ovih entiteta vrlo jednostavna (oba entiteta moraju sadržavati isti \textit{UID})
 sigurno je implementirati funkcionalnost u grafičkom sučelju.
+
+\subsection{Autorizacija korisnika}
+
+Sadržaj dnevnika pristupa i upravljanje karticama nije javno dostupno.
+Korisnik je dužan autorizirati se pomoću svojih pristupnih podataka (korisničko ime i lozinka) prije poduzimanja bilo
+kojih drugih radnji.
+
+Autorizacija korisnika je dostupna na putanji \textbf{/api/login} kroz \textbf{POST} metodu.
+
+\begin{lstlisting}[language=PHP]
+Route::post('login', LoginAction::class);
+\end{lstlisting}
+
+Prije implementiranja autorizacije potrebno je pohraniti korisničke pristupne podatke.
+Za to će poslužiti jednostavan entitet "Korisnik" koji sadrži podatke o korisničkom imenu i lozinki.
+Poput prethodnih entiteta i ovaj entitet je vrlo jednostavan pa nema potrebe za ER dijagramom, samo migracijski kod:
+
+\begin{lstlisting}[language=PHP]
+class CreateUsersTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('username')->unique();
+            $table->string('password');
+            $table->timestamps();
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('users');
+    }
+}
+\end{lstlisting}
+
+Potreban je i model \textbf{User}, no ovaj put se ne nasljeđuje klasa \textit{Model} već klasa \textit{Authenticatable}.
+Ta klasa sadrži određene metode potrebne za autoriziranje korisnika pa radni okvir pomoću nje zna kako autorizirati korisnika
+i stvoriti sesiju.
+
+\begin{lstlisting}[language=PHP]
+class User extends Authenticatable
+{
+}
+\end{lstlisting}
+
+Radni okvir sadrži korisnu metodu \textbf{Auth::attempt} koja prima jedan parametar tipa polje.
+U polje se postave vrijednosti korisničkog imena i lozinke koje je poslao korisnik i ako su podaci točni, korisnik je autoriziran.
+Ovisno o ishodu metode vraća se prikladna poruka u JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+class LoginAction extends Controller
+{
+    public function __invoke(Request $request): JsonResponse
+    {
+        $username = $request->username;
+        $password = $request->password;
+
+        if (Auth::attempt(['username' => $username, 'password' => $password]) === false) {
+            return response()->json(['message' => 'Korisnicko ime i/ili lozinka su ne ispravni.'], 401);
+        }
+
+        return response()->json(['message' => 'Uspjesna prijava']);
+    }
+}
+\end{lstlisting}
