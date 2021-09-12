@@ -417,8 +417,8 @@ class LogProhibitedBoxAccess
 
 Oba osluškivača dijele sličnu logiku: stvore novi \textit{AccessLog} model, zapišu UID iz događaja, datum i vrijeme te
 (ne)uspješnost pristupa i to pohrane u bazu podataka.
-U suštini, razlika je u događaju koji osluškuju i vrijednosti polja \textit{access \textunderscore granted}.
-Funkcija \textit{now()} vraća objekt tipa \textit{DateTime}, a vrijednost polja \textit{access \textunderscore granted}
+U suštini, razlika je u događaju koji osluškuju i vrijednosti polja \textit{access\textunderscore granted}.
+Funkcija \textit{now()} vraća objekt tipa \textit{DateTime}, a vrijednost polja \textit{access\textunderscore granted}
 je \textit{true} ili \textit{false}.
 Zbog prethodno definiranog atributa \textit{\$casts} u modelu \textit{AccessLog} prilikom spremanja u bazu podataka,
 radni okvir zna kako pretvoriti objekte i vrijednosti u tipove podataka koje baza podataka razumije.
