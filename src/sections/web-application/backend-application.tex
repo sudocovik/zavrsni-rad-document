@@ -254,3 +254,171 @@ public function destroy(Card $card): JsonResponse
     }
 }
 \end{lstlisting}
+
+\subsection{Autorizacija kartica}
+
+Prilikom podnošenja zahtjeva sef mora poslati UID kartice koju treba autorizirati.
+Ukoliko kartica postoji vraća se HTTP statusni kod 200 kao indikator uspješnog autoriziranja ili 403 kao indikator
+neuspješnog autoriziranja.
+U pristupni dnevnik je potrebno stvoriti novi zapis s datumom i UID-em kartice kao i (ne)uspješnost autorizacije.
+
+Autorizacija je izložena na putanji \textbf{/api/box/authorize} kroz \textbf{POST} metodu,
+
+\begin{lstlisting}[language=PHP]
+Route::post('/box/authorize', BoxAuthorizationAction::class);
+\end{lstlisting}
+
+a implementirana je u \textbf{BoxAuthorizationAction} metodi:
+
+\begin{lstlisting}[language=PHP]
+class BoxAuthorizationAction
+{
+    public function __invoke(Request $request): Response
+    {
+        $uid = (string) $request->uid;
+
+        if (Card::existsByUid($uid)) {
+            event(new BoxAccessWasGranted($uid));
+            return response()->noContent(200);
+        }
+
+        event(new BoxAccessWasProhibited($uid));
+        return response()->noContent(403);
+    }
+}
+\end{lstlisting}
+
+Kako je autorizacijska logika zasebna klasa, koristi se posebna metoda \textit{\textunderscore\textunderscore invoke} koja omogućuje pozivanje objekta
+poput običnih funkcija.
+Prethodno definirana metoda \textit{existsByUid} u entitetu "Kartica" koristi se pri odlučivanju koja akcija se poduzima:
+odobravanje ili odbijanje zahtjeva.
+Logika zapisivanja u pristupni dnevnik nije direktno implementirana već se koristi sustav događaja (eng. \textit{event})
+i osluškivača (eng. \textit{listener}).
+Događaji definiraju popratne informacije dok osluškivači koriste te informacije i poduzimaju određene akcije.
+
+\pagebreak
+
+Dovoljna su dva događaja:
+\begin{enumerate}
+    \item Pristup dozvoljen
+        \begin{lstlisting}[language=PHP]
+class BoxAccessWasGranted
+{
+    private string $uid;
+
+    public function __construct(string $uid)
+    {
+        $this->uid = $uid;
+    }
+
+    public function uid(): string
+    {
+        return $this->uid;
+    }
+}
+        \end{lstlisting}
+    \item Pristup odbijen
+        \begin{lstlisting}[language=PHP]
+class BoxAccessWasProhibited
+{
+    private string $uid;
+
+    public function __construct(string $uid)
+    {
+        $this->uid = $uid;
+    }
+
+    public function uid(): string
+    {
+        return $this->uid;
+    }
+}
+        \end{lstlisting}
+\end{enumerate}
+
+Oba događaja primaju \textit{UID} kao parametar i daju ga na raspolaganje osluškivačima kroz metodu \textit{uid()}.
+
+Prije implementiranja osluškivača potrebno je stvoriti entitet "Pristupni dnevnik".
+On sadrži podatke o kartici (\textit{UID}), datum i vrijeme i (ne)uspješnost pristupa.
+Poput entiteta "Kartica" i ovaj entitet je vrlo jednostavan pa nema potrebe za ER dijagramom, samo migracijski kod:
+
+\begin{lstlisting}[language=PHP]
+class CreateAccessLogsTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('access_logs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uid');
+            $table->timestamp('at_time');
+            $table->boolean('access_granted');
+        });
+    }
+
+
+    public function down()
+    {
+        Schema::dropIfExists('access_logs');
+    }
+}
+\end{lstlisting}
+
+Naravno, potrebna je i klasa \textbf{AccessLog} koja nasljeđuje klasu \textit{Model} da se izbjegne rad s čistim SQL-om.
+
+\begin{lstlisting}[language=PHP]
+class AccessLog extends Model
+{
+    protected $casts = [
+        'at_time' => 'datetime',
+        'access_granted' => 'boolean'
+    ];
+}
+\end{lstlisting}
+
+Potrebno je i određena polja prebaciti u određene tipove podataka (atribut \textbf{\$casts}).
+Kako baza podataka vraća datum i vrijeme u obliku teksta važno je prebaciti tip podataka u klasu koja olakšava rad s datumima:
+\textit{DateTime}.
+Polje \textit{at\textunderscore time} će biti prebačeno u tip \textit{DateTime}, a polje \textit{access\textunderscore granted} u tip \textit{boolean}.
+
+
+Nakon definiranja modela moguće je implementirati osluškivače.
+
+\begin{lstlisting}[language=PHP]
+class LogGrantedBoxAccess
+{
+    public function handle(BoxAccessWasGranted $event)
+    {
+        $uid = $event->uid();
+
+        $newLogEntry = new AccessLog();
+        $newLogEntry->uid = $uid;
+        $newLogEntry->at_time = now();
+        $newLogEntry->access_granted = true;
+
+        $newLogEntry->save();
+    }
+}
+
+class LogProhibitedBoxAccess
+{
+    public function handle(BoxAccessWasProhibited $event)
+    {
+        $uid = $event->uid();
+
+        $newLogEntry = new AccessLog();
+        $newLogEntry->uid = $uid;
+        $newLogEntry->at_time = now();
+        $newLogEntry->access_granted = false;
+
+        $newLogEntry->save();
+    }
+}
+\end{lstlisting}
+
+Oba osluškivača dijele sličnu logiku: stvore novi \textit{AccessLog} model, zapišu UID iz događaja, datum i vrijeme te
+(ne)uspješnost pristupa i to pohrane u bazu podataka.
+U suštini, razlika je u događaju koji osluškuju i vrijednosti polja \textit{access \textunderscore granted}.
+Funkcija \textit{now()} vraća objekt tipa \textit{DateTime}, a vrijednost polja \textit{access \textunderscore granted}
+je \textit{true} ili \textit{false}.
+Zbog prethodno definiranog atributa \textit{\$casts} u modelu \textit{AccessLog} prilikom spremanja u bazu podataka,
+radni okvir zna kako pretvoriti objekte i vrijednosti u tipove podataka koje baza podataka razumije.
