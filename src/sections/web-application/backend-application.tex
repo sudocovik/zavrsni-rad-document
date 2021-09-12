@@ -422,3 +422,36 @@ Funkcija \textit{now()} vraća objekt tipa \textit{DateTime}, a vrijednost polja
 je \textit{true} ili \textit{false}.
 Zbog prethodno definiranog atributa \textit{\$casts} u modelu \textit{AccessLog} prilikom spremanja u bazu podataka,
 radni okvir zna kako pretvoriti objekte i vrijednosti u tipove podataka koje baza podataka razumije.
+
+\subsection{Pregled evidencije (ne)autoriziranih kartica}
+
+Korištenjem sefa puni se pristupni dnevnik.
+No, koliko god zapisa postojalo, od njih nema pretjerane koristi ako se do njih ne može doći.
+Zato valja izložiti te podatke grafičkom sučelju.
+
+Potrebno je vratiti sve zapise dnevnika pristupa u JSON formatu sortirane silazno po datumu stvaranja (prvo najnoviji zapisi).
+Zapisi su dostupni na putanji \textbf{/api/access-log} kroz \textbf{GET} metodu,
+
+\begin{lstlisting}[language=PHP]
+Route::get('/access-log', FetchAccessLogAction::class);
+\end{lstlisting}
+
+a implementirana je u \textbf{FetchAccessLogAction} metodi:
+
+\begin{lstlisting}[language=PHP]
+class FetchAccessLogAction
+{
+    public function __invoke(Request $request): JsonResponse
+    {
+        $accessLogEntries = AccessLog::query()->orderByDesc('at_time')->get();
+
+        return response()->json(['data' => $accessLogEntries]);
+    }
+}
+\end{lstlisting}
+
+Važno je naglasiti da se zapisi ne povezuju s entitetom "Kartica" već je to delegirano na grafičko sučelje.
+Kako korisnik može izmjenjivati i brisati kartice, nakon bilo koje akcije bilo bi potrebno osvježiti podatke iz dnevnika
+pristupa što generira nepotreban mrežni promet.
+S obzirom da je logika povezivanja ovih entiteta vrlo jednostavna (oba entiteta moraju sadržavati isti \textit{UID})
+sigurno je implementirati funkcionalnost u grafičkom sučelju.
