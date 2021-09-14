@@ -346,3 +346,166 @@ export default {
   }
 }
 \end{lstlisting}
+
+\subsection{Pregled dnevnika pristupa}
+
+Dnevnik pristupa implementiran je kao vremenska crta dozvoljenih i odbijenih pristupa.
+Svaka stavka ima vrijeme pristupa, naziv ili UID kartice te status (dozvoljeno ili odbijeno).
+Stavke su grupirane po datumu.
+
+\pagebreak
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{images/access-log}
+    \caption{Vremenska crta dnevnika pristupa}
+    \label{fig:access-log}
+\end{figure}
+
+Potrebne komponente su podijeljenje u dvije grupe:
+\begin{enumerate}
+    \item Komponente za obradu podataka
+    \item Komponente za prikaz podataka
+\end{enumerate}
+
+Komponenta \textbf{AccessLogData} brine se o preuzimanju podataka sa servera.
+Preuzete podatke daje na korištenje ostalim komponentama kroz polje \textit{entries}.
+
+\begin{lstlisting}
+export default {
+  name: 'AccessLogData',
+
+  data: () => ({
+    entries: []
+  }),
+
+  created () {
+    this.fetchAccessLogEntries()
+  },
+
+  methods: {
+    async fetchAccessLogEntries () {
+      const { data: { data } } = await axios.get('/api/access-log')
+
+      this.entries = data
+    }
+  }
+}
+\end{lstlisting}
+
+Prethodno je rečeno da kartice nisu povezane s dnevnikom pristupa u pozadinskoj aplikaciji već kroz grafičko sučelje.
+Kako se u vremenskoj crti prikazuje naziv kartice ako ona postoji (u suprotnom se prikazuje UID), brisanje ili dodavanje
+kartica zahtjeva promjene vremenske crte.
+Također, potrebno je grupirati stavke po datumu.
+Ovi zahtjevi su implementirani u komponenti \textbf{AccessLogBridge}.
+
+\begin{lstlisting}
+const yearFormat = 'yyyy'
+const dateFormat = 'dd.MM.' + yearFormat
+
+computed: {
+  timelineGroups () {
+    const entriesGroupedByDate = groupBy(this.entries, entry => format(entry.timestamp(), dateFormat))
+
+    const groupedEntriesWithSimplifiedDates = mapKeys(entriesGroupedByDate, (_, key) => this.simplifyDate(key))
+
+    return mapValues(groupedEntriesWithSimplifiedDates, entries => entries.map(this.convertEntryToTimelineItem))
+  }
+},
+
+methods: {
+  createTimelineItemContent (entry) {
+    const entryUid = entry.uid()
+
+    const findCardByEntryUid = () => this.cards.find(card => card.uid === entryUid) || null
+
+    const cardName = findCardByEntryUid()?.name || null
+
+    return cardName ?? entryUid
+  },
+
+  convertEntryToTimelineItem (entry) {
+    return new TimelineListItemModel(
+      entry.id,
+      format(entry.timestamp(), 'HH:mm'),
+      this.createTimelineItemContent(entry),
+      entry instanceof AccessGrantedEntry
+    )
+  },
+
+  simplifyDate (date) {
+    const today = format(new Date(), dateFormat)
+    const yesterday = format(startOfYesterday(), dateFormat)
+    const currentYear = format(new Date(), yearFormat)
+
+    if (date === today) return 'Danas'
+    else if (date === yesterday) return 'Jučer'
+    else if (date.substr(-yearFormat.length) === currentYear) return date.substring(0, date.length - yearFormat.length)
+
+    return date
+  }
+}
+\end{lstlisting}
+
+Obrađeni podaci prosljeđuju se komponenti za prikaz vremenske crte.
+To je komponenta \textbf{AccessLogTimeline} koja uz pomoć petlje prikazuje sve grupe.
+
+\begin{lstlisting}[language=HTML]
+<TimelineGroup
+    v-for="(items, date) of groups"
+    :key="date"
+
+    :title="date"
+    :items="items"
+/>
+\end{lstlisting}
+
+Svaka grupa ima više stavki pa je prikaz istih delegiran na \textbf{TimelineGroup} komponentu.
+
+\begin{lstlisting}
+<v-timeline-item hide-dot>
+    <span class="text-uppercase text--secondary font-weight-bold is-size-5">{{ date }}</span>
+</v-timeline-item>
+
+<TimelineList :items="items" />
+\end{lstlisting}
+
+Prvi element je datum, ponaša se kao naslov grupe.
+Komponenta \textbf{TimelineList} zadužena je prikaz svih stavki jedne grupe.
+
+\begin{lstlisting}[language=HTML]
+<TimelineItem
+    v-for="item in internalItems"
+    :key="item.id"
+
+    :success="item.success"
+    :time="item.time"
+>
+    <span :class="{ 'font-italic': !item.success }">{{ item.content }}</span>
+</TimelineItem>
+\end{lstlisting}
+
+Pomoću petlje prikazuje više \textbf{TimelineItem} komponenti.
+Ta komponenta prikazuje vrijeme, sadržaj i dvije različite ikone i boje ovisno o (ne)uspješnosti pristupa.
+
+\begin{lstlisting}[language=HTML]
+<v-timeline-item
+  :icon="success ? 'mdi-credit-card-check' : 'mdi-lock'"
+  fill-dot
+  :color="(success ? 'green' : 'red') + ' darken-3'"
+>
+  <div class="text--secondary">{ time }</div>
+  <v-card class="custom-timeline-item-card">
+    <v-card-text>
+          <span>
+              <slot />
+          </span>
+    </v-card-text>
+  </v-card>
+</v-timeline-item>
+\end{lstlisting}
+
+Rezultat je prikaz dnevnika pristupa odnosno povijest (ne)uspješnih pristupa (slika~\ref{fig:access-log}).
+
+Aplikacija za kontrolu pristupa je dovršena, a sljedeći korak je sef koji će aplikaciji dati smisao i način punjenja
+dnevnika pristupa.
