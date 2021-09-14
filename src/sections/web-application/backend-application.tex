@@ -106,8 +106,8 @@ public function index(): JsonResponse
 }
 \end{lstlisting}
 
-Prema tablici~\ref{tab:card_functionalities} stvaranje nove kartice je implementiran u metodi \textbf{store}.
-Metoda stvara objekt \textit{Card} i popunjava ga s podacima danih od strane korisnika.
+Prema tablici~\ref{tab:card_functionalities} stvaranje nove kartice je implementirano u metodi \textbf{store}.
+Metoda stvara objekt \textit{Card} i popunjava ga s podacima dobivenim od strane korisnika.
 Kod uspješnog spremanja vraćaju se svi podaci o kartici u JSON formatu, a kod neuspješnog spremanja vraća se kratka poruka,
 također u JSON formatu.
 
@@ -375,8 +375,8 @@ class AccessLog extends Model
 }
 \end{lstlisting}
 
-Potrebno je i određena polja prebaciti u određene tipove podataka (atribut \textbf{\$casts}).
-Kako baza podataka vraća datum i vrijeme u obliku teksta važno je prebaciti tip podataka u klasu koja olakšava rad s datumima:
+Važno je određena polja prebaciti u određene tipove podataka (atribut \textbf{\$casts}).
+Kako baza podataka vraća datum i vrijeme u obliku teksta potrebno je prebaciti tip podataka u klasu koja olakšava rad s datumima:
 \textit{DateTime}.
 Polje \textit{at\textunderscore time} će biti prebačeno u tip \textit{DateTime}, a polje \textit{access\textunderscore granted} u tip \textit{boolean}.
 

@@ -182,7 +182,7 @@ Na slici~\ref{fig:card-state-machine} prikazan je dijagram mašine stanja jedne 
 Zadano stanje je ujedno i početno stanje (eng. \textit{initial state}) i jedino iz tog stanja se može prijeći
 u druga dva uz pomoć tranzicija "Briši" i "Uredi".
 Druga dva stanja imaju po dvije tranzicije "Potvrdi" i "Odustani" koje vode u zadano stanje.
-Prema dijagramu nije moguće direktno prijeći iz stanja brisanja u stanje uređivanja.
+Prema dijagramu nije moguće direktno prijeći iz stanja brisanja u stanje uređivanja i obratno.
 
 Svako stanje zahtjeva nešto drugačije sučelje i elemente pa je pogodno kreirati zasebne komponente za svako stanje.
 Tri su komponente potrebne:
@@ -471,7 +471,7 @@ Svaka grupa ima više stavki pa je prikaz istih delegiran na \textbf{TimelineGro
 \end{lstlisting}
 
 Prvi element je datum, ponaša se kao naslov grupe.
-Komponenta \textbf{TimelineList} zadužena je prikaz svih stavki jedne grupe.
+Komponenta \textbf{TimelineList} zadužena je za prikaz svih stavki jedne grupe.
 
 \begin{lstlisting}[language=HTML]
 <TimelineItem
