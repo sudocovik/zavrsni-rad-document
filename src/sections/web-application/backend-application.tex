@@ -1,0 +1,524 @@
+Pozadinska aplikacija definira većinski dio logike sustava.
+Svoje funkcionalnosti daje na korištenje kroz REST API kako bi grafičko sučelje i sef mogli ispunjavati svoje uloge.
+Funkcionalnosti su sljedeće:
+
+\begin{itemize}
+    \item Upravljanje karticama
+    \item Autorizacija kartica
+    \item Pregled dnevnika pristupa
+    \item Autorizacija korisnika
+\end{itemize}
+
+Funkcionalnosti su implementirane u programskom jeziku \textit{PHP} uz pomoć \textit{Laravel} radnog okvira.
+
+\subsection{Upravljanje karticama}
+
+Entitet "Kartica" sadrži podatke o imenu kartice i jedinstvenom identifikatoru (\textit{UID}).
+Sadrži i meta podatke o datumu stvaranja i datumu izmjene.
+Entitetom korisnik upravlja kroz grafičko sučelje, a pozadinska aplikacija koristi jedinstvene identifikatore pri autoriziranju
+zahtjeva sefa.
+
+Entitet kartice nema relacija na druge entitete pa nema smisla prikazivati ER dijagram već je dovoljan programski kod.
+Radni okvir omogućava definiranje migracija baze podataka kroz programski jezik umjesto pisanja čistog SQL-a.
+
+\begin{lstlisting}[language=PHP]
+class CreateCardsTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('cards', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->string('uid')->unique();
+            $table->timestamps();
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('cards');
+    }
+}
+\end{lstlisting}
+
+Radni okvir ima ORM (\textit{Object Relational Mapper}) zvan \textit{Eloquent} što omogućava rad s bazom kroz objekte
+umjesto ručnog pisanja SQL upita.
+Dovoljno je definirati klasu prema imenu tablice, u jednini, i naslijediti klasu \textit{Model} iz radnog okvira.
+
+\begin{lstlisting}[language=PHP]
+class Card extends Model
+{
+    static function existsByUid(string $uid)
+    {
+        return static::query()->where('uid', '=', $uid)->exists() === true;
+    }
+}
+\end{lstlisting}
+
+Statična metoda \textit{existsByUid} provjerava postoji li zapis kartice s danim \textit{UID-em} i vraća \textit{true} ili \textit{false}.
+Ona je osnovica za autorizacijske zahtjeve sefa.
+
+\pagebreak
+
+Operacije nad entitetom kartice su izložene (dane na korištenje) vanjskom svijetu, odnosno grafičkom sučelju kroz niz
+HTTP putanji:
+
+\begin{table}[h!]
+    \centering
+    \caption{Prikaz putanja svih funkcionalnosti upravljanja karticama}
+    \begin{tabularx}{\textwidth}{|X|X|X|}
+        \hline
+        \cellcolor{gray!25} Funkcionalnost & \cellcolor{gray!25} HTTP Metoda + Putanja & \cellcolor{gray!25} Klasa@Metoda \\
+        \hline
+        Popis svih kartica & GET /api/card & CardController@index \\
+        \hline
+        Stvaranje kartice & POST /api/card & CardController@store \\
+        \hline
+        Uređivanje kartice & PUT /api/card/\{id\} & CardController@update \\
+        \hline
+        Brisanje kartice & DELETE /api/card/\{id\} & CardController@destroy \\
+        \hline
+    \end{tabularx}
+    \\[10pt]
+    \label{tab:card_functionalities}
+\end{table}
+
+Iz tablice~\ref{tab:card_functionalities} može se vidjeti da sve funkcionalnosti dijele isti dio putanje URL-a: \textbf{/api/card}
+kao i istu klasu u kojoj su implementirane metode: \textbf{CardController}.
+Kako su \textit{Create, Read, Update, Delete (CRUD)} operacije nad istim entitetom ponavljajući uzorak u većini aplikacija, radni okvir omogućava
+jednostavno definiranje putanja i pripadnih metoda:
+
+\begin{lstlisting}[language=PHP]
+Route::resource('card', CardController::class)->only(['index', 'store', 'update', 'destroy']);
+\end{lstlisting}
+
+Prema tablici~\ref{tab:card_functionalities} popis svih kartica je implementiran u metodi \textbf{index}.
+Jednostavan upit dohvaća osnovne podatke o karticama, sortira ih po datumu stvaranja i vraća u JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+public function index(): JsonResponse
+{
+    $cardsByCreationDateAscending = Card::query()->select(['id', 'name', 'uid'])->orderBy('created_at')->get();
+
+    return response()->json([
+        'data' => $cardsByCreationDateAscending
+    ]);
+}
+\end{lstlisting}
+
+Prema tablici~\ref{tab:card_functionalities} stvaranje nove kartice je implementirano u metodi \textbf{store}.
+Metoda stvara objekt \textit{Card} i popunjava ga s podacima dobivenim od strane korisnika.
+Kod uspješnog spremanja vraćaju se svi podaci o kartici u JSON formatu, a kod neuspješnog spremanja vraća se kratka poruka,
+također u JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+public function store(StoreCard $request): JsonResponse
+{
+    $name = $request->name;
+    $uid = $request->uid;
+
+    $card = new Card();
+    $card->name = $name;
+    $card->uid = $uid;
+
+    if ($card->save()) {
+        return response()->json([
+            'data' => $card->fresh()
+        ]);
+    }
+
+    return response()->json(['data' => 'Neuspjesna pohrana kartice. Pokusajte ponovo!']);
+}
+\end{lstlisting}
+
+Tip argumenta \textit{\$request} je \textit{StoreCard}.
+To je klasa koju radni okvir instancira prilikom obrađivanja zahtjeva i ona služi za validaciju podataka.
+Ukoliko uvjeti nisu zadovoljeni, metoda \textit{store} se neće izvršiti već se vraća kratka poruka sa svim problemima u
+JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+class StoreCard extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' => [
+                'required',
+                'string',
+                'max:30',
+                Rule::unique(Card::class, 'name')
+            ],
+            'uid' => [
+                'required',
+                'string',
+                'max:40',
+                Rule::unique(Card::class, 'uid')
+            ]
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.unique' => 'Ime vec postoji.',
+            'name.max' => 'Ime moze biti maksimalno 30 znakova.',
+            'name.*' => 'Ime je obavezno.',
+            'uid.unique' => 'UID vec postoji.',
+            'uid.max' => 'UID moze biti maksimalno 40 znakova.',
+            'uid.*' => 'UID je obavezan.'
+        ];
+    }
+}
+\end{lstlisting}
+
+Metoda \textit{rules} vraća polje (eng. \textit{array}) svih uvjeta koje treba zadovoljiti.
+Naziv kartice je obavezan (\textit{'required'}) tekst (\textit{'string'}) do trideset znakova (\textit{'max:30'}) i mora biti
+unikatan, tj.\ u bazi podataka ne smije postojati kartica s istim imenom (\textit{Rule::unique}).
+Slični uvjeti vrijede i za \textit{UID} kartice, razlika je jedino u maksimalnom broju znakova i naziv polja po kojem se
+gleda uvjet unikatnosti.
+Metoda \textit{messages} vraća polje s porukama korisnim za korisnika kako bi znao u čemu je problem.
+
+\pagebreak
+
+Prema tablici~\ref{tab:card_functionalities} uređivanje postojeće kartice je implementirano u metodi \textbf{update}.
+Funkcionalnost je slična kao i kod stvaranja nove kartice, no implementacija je nešto drukčija.
+
+\begin{lstlisting}[language=PHP]
+public function update(Card $card, UpdateCard $request): JsonResponse
+{
+    $card->name = $request->name;
+
+    if ($card->save()) {
+        return response()->json([
+            'data' => $card->fresh()
+        ]);
+    }
+
+    return response()->json(['data' => 'Neuspjesno azuriranje kartice. Pokusajte ponovo!']);
+}
+\end{lstlisting}
+
+Kako se radi o postojećoj kartici potrebno ju je jedinstveno identificirati.
+Za to se koristi jedinstveni identifikator odnosno primarni ključ kojeg dodjeljuje baza podataka.
+Pri slanju zahtjeva identifikator je dio putanje (\textit{/api/card/\{id\}} - tablica~\ref{tab:card_functionalities}).
+Nalazi se u vitičastim zagradama pa radni okvir zna da vrijednost mora proslijediti u pripadajuću metodu (\textit{update}).
+Zaglavlje metode bi onda izgledalo:
+
+\begin{lstlisting}[language=PHP]
+public function update(int $id, UpdateCard $request): JsonResponse
+\end{lstlisting}
+
+To implicira manualno slanje upita prema bazi podataka i provjeru postoji li kartica.
+Kako je ovo česti problem većine aplikacija, radni okvir daje jednostavno rješenje: Tip argumenta postaviti na željeni
+entitet (klasu) umjesto broja (\textit{int}, \textit{integer}).
+Radni okvir pretpostavlja da se za uvjet pretrage koristi primarni ključ (\textit{ID}) jer je on jedinstven i ne može
+biti \textit{null}.
+Ukoliko entitet postoji, radni okvir prilaže sve informacije o tom entitetu kao argument metode i izvršava metodu.
+Ukoliko entitet ne postoji, radni okvir zaustavlja izvršavanje skripte i ne poziva metodu.
+
+Validacija podataka zahtjeva drugačije ponašanje.
+
+\begin{lstlisting}[language=PHP]
+public function rules(): array
+{
+    $cardUnderModification = $this->route('card');
+
+    return [
+        'name' => [
+            'required',
+            'string',
+            'max:30',
+            Rule::unique(Card::class, 'name')->ignore($cardUnderModification->id)
+        ]
+    ];
+}
+\end{lstlisting}
+
+Kako korisnik može dati isti podatke (nije ništa promijenio) zahtjev se mora normalno izvršiti, bez ikakvih greški.
+Sve što je potrebno napraviti je pri provjeri unikatnosti ignorirati karticu koja se uređuje.
+
+Prema tablici~\ref{tab:card_functionalities} brisanje kartice je implementirano u metodi \textbf{destroy}.
+Kao i kod uređivanja kartice, tip argumenta je entitet \textit{Card} kojeg radni okvir automatski ubacuje pri izvršavanju metode.
+Ovisno o uspješnosti brisanja, prikladna poruka se vraća u JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+public function destroy(Card $card): JsonResponse
+{
+    try {
+        $card->delete();
+
+        return response()->json(['data' => 'Kartica uspjesno obrisana.']);
+    }
+    catch (Throwable $exception) {
+        return response()->json(['data' => 'Neuspjesno brisanje kartice. Pokusajte ponovo!']);
+    }
+}
+\end{lstlisting}
+
+\subsection{Autorizacija kartica}
+
+Prilikom podnošenja zahtjeva sef mora poslati UID kartice koju treba autorizirati.
+Ukoliko kartica postoji vraća se HTTP statusni kod 200 kao indikator uspješnog autoriziranja ili 403 kao indikator
+neuspješnog autoriziranja.
+U pristupni dnevnik je potrebno stvoriti novi zapis s datumom i UID-em kartice kao i (ne)uspješnost autorizacije.
+
+Autorizacija je izložena na putanji \textbf{/api/box/authorize} kroz \textbf{POST} metodu,
+
+\begin{lstlisting}[language=PHP]
+Route::post('/box/authorize', BoxAuthorizationAction::class);
+\end{lstlisting}
+
+a implementirana je u \textbf{BoxAuthorizationAction} metodi:
+
+\begin{lstlisting}[language=PHP]
+class BoxAuthorizationAction
+{
+    public function __invoke(Request $request): Response
+    {
+        $uid = (string) $request->uid;
+
+        if (Card::existsByUid($uid)) {
+            event(new BoxAccessWasGranted($uid));
+            return response()->noContent(200);
+        }
+
+        event(new BoxAccessWasProhibited($uid));
+        return response()->noContent(403);
+    }
+}
+\end{lstlisting}
+
+Kako je autorizacijska logika zasebna klasa, koristi se posebna metoda \textit{\textunderscore\textunderscore invoke} koja omogućuje pozivanje objekta
+poput običnih funkcija.
+Prethodno definirana metoda \textit{existsByUid} u entitetu "Kartica" koristi se pri odlučivanju koja akcija se poduzima:
+odobravanje ili odbijanje zahtjeva.
+Logika zapisivanja u pristupni dnevnik nije direktno implementirana već se koristi sustav događaja (eng. \textit{event})
+i osluškivača (eng. \textit{listener}).
+Događaji definiraju popratne informacije dok osluškivači koriste te informacije i poduzimaju određene akcije.
+
+\pagebreak
+
+Dovoljna su dva događaja:
+\begin{enumerate}
+    \item Pristup dozvoljen
+        \begin{lstlisting}[language=PHP]
+class BoxAccessWasGranted
+{
+    private string $uid;
+
+    public function __construct(string $uid)
+    {
+        $this->uid = $uid;
+    }
+
+    public function uid(): string
+    {
+        return $this->uid;
+    }
+}
+        \end{lstlisting}
+    \item Pristup odbijen
+        \begin{lstlisting}[language=PHP]
+class BoxAccessWasProhibited
+{
+    private string $uid;
+
+    public function __construct(string $uid)
+    {
+        $this->uid = $uid;
+    }
+
+    public function uid(): string
+    {
+        return $this->uid;
+    }
+}
+        \end{lstlisting}
+\end{enumerate}
+
+Oba događaja primaju \textit{UID} kao parametar i daju ga na raspolaganje osluškivačima kroz metodu \textit{uid()}.
+
+Prije implementiranja osluškivača potrebno je stvoriti entitet "Pristupni dnevnik".
+On sadrži podatke o kartici (\textit{UID}), datum i vrijeme i (ne)uspješnost pristupa.
+Poput entiteta "Kartica" i ovaj entitet je vrlo jednostavan pa nema potrebe za ER dijagramom, samo migracijski kod:
+
+\begin{lstlisting}[language=PHP]
+class CreateAccessLogsTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('access_logs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uid');
+            $table->timestamp('at_time');
+            $table->boolean('access_granted');
+        });
+    }
+
+
+    public function down()
+    {
+        Schema::dropIfExists('access_logs');
+    }
+}
+\end{lstlisting}
+
+Naravno, potrebna je i klasa \textbf{AccessLog} koja nasljeđuje klasu \textit{Model} da se izbjegne rad s čistim SQL-om.
+
+\begin{lstlisting}[language=PHP]
+class AccessLog extends Model
+{
+    protected $casts = [
+        'at_time' => 'datetime',
+        'access_granted' => 'boolean'
+    ];
+}
+\end{lstlisting}
+
+Važno je određena polja prebaciti u određene tipove podataka (atribut \textbf{\$casts}).
+Kako baza podataka vraća datum i vrijeme u obliku teksta potrebno je prebaciti tip podataka u klasu koja olakšava rad s datumima:
+\textit{DateTime}.
+Polje \textit{at\textunderscore time} će biti prebačeno u tip \textit{DateTime}, a polje \textit{access\textunderscore granted} u tip \textit{boolean}.
+
+
+Nakon definiranja modela moguće je implementirati osluškivače.
+
+\begin{lstlisting}[language=PHP]
+class LogGrantedBoxAccess
+{
+    public function handle(BoxAccessWasGranted $event)
+    {
+        $uid = $event->uid();
+
+        $newLogEntry = new AccessLog();
+        $newLogEntry->uid = $uid;
+        $newLogEntry->at_time = now();
+        $newLogEntry->access_granted = true;
+
+        $newLogEntry->save();
+    }
+}
+
+class LogProhibitedBoxAccess
+{
+    public function handle(BoxAccessWasProhibited $event)
+    {
+        $uid = $event->uid();
+
+        $newLogEntry = new AccessLog();
+        $newLogEntry->uid = $uid;
+        $newLogEntry->at_time = now();
+        $newLogEntry->access_granted = false;
+
+        $newLogEntry->save();
+    }
+}
+\end{lstlisting}
+
+Oba osluškivača dijele sličnu logiku: stvore novi \textit{AccessLog} model, zapišu UID iz događaja, datum i vrijeme te
+(ne)uspješnost pristupa i to pohrane u bazu podataka.
+U suštini, razlika je u događaju koji osluškuju i vrijednosti polja \textit{access\textunderscore granted}.
+Funkcija \textit{now()} vraća objekt tipa \textit{DateTime}, a vrijednost polja \textit{access\textunderscore granted}
+je \textit{true} ili \textit{false}.
+Zbog prethodno definiranog atributa \textit{\$casts} u modelu \textit{AccessLog} prilikom spremanja u bazu podataka,
+radni okvir zna kako pretvoriti objekte i vrijednosti u tipove podataka koje baza podataka razumije.
+
+\subsection{Pregled dnevnika pristupa}
+
+Korištenjem sefa puni se pristupni dnevnik.
+No, koliko god zapisa postojalo, od njih nema pretjerane koristi ako se do njih ne može doći.
+Zato valja izložiti te podatke grafičkom sučelju.
+
+Potrebno je vratiti sve zapise dnevnika pristupa u JSON formatu sortirane silazno po datumu stvaranja (prvo najnoviji zapisi).
+Zapisi su dostupni na putanji \textbf{/api/access-log} kroz \textbf{GET} metodu,
+
+\begin{lstlisting}[language=PHP]
+Route::get('/access-log', FetchAccessLogAction::class);
+\end{lstlisting}
+
+a implementirana je u \textbf{FetchAccessLogAction} metodi:
+
+\begin{lstlisting}[language=PHP]
+class FetchAccessLogAction
+{
+    public function __invoke(Request $request): JsonResponse
+    {
+        $accessLogEntries = AccessLog::query()->orderByDesc('at_time')->get();
+
+        return response()->json(['data' => $accessLogEntries]);
+    }
+}
+\end{lstlisting}
+
+Važno je naglasiti da se zapisi ne povezuju s entitetom "Kartica" već je to delegirano na grafičko sučelje.
+Kako korisnik može izmjenjivati i brisati kartice, nakon bilo koje akcije bilo bi potrebno osvježiti podatke iz dnevnika
+pristupa što generira nepotreban mrežni promet.
+S obzirom da je logika povezivanja ovih entiteta vrlo jednostavna (oba entiteta moraju sadržavati isti \textit{UID})
+sigurno je implementirati funkcionalnost u grafičkom sučelju.
+
+\subsection{Autorizacija korisnika}
+
+Sadržaj dnevnika pristupa i upravljanje karticama nije javno dostupno.
+Korisnik je dužan autorizirati se pomoću svojih pristupnih podataka (korisničko ime i lozinka) prije poduzimanja bilo
+kojih drugih radnji.
+
+Autorizacija korisnika je dostupna na putanji \textbf{/api/login} kroz \textbf{POST} metodu.
+
+\begin{lstlisting}[language=PHP]
+Route::post('login', LoginAction::class);
+\end{lstlisting}
+
+Prije implementiranja autorizacije potrebno je pohraniti korisničke pristupne podatke.
+Za to će poslužiti jednostavan entitet "Korisnik" koji sadrži podatke o korisničkom imenu i lozinki.
+Poput prethodnih entiteta i ovaj entitet je vrlo jednostavan pa nema potrebe za ER dijagramom, samo migracijski kod:
+
+\begin{lstlisting}[language=PHP]
+class CreateUsersTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('username')->unique();
+            $table->string('password');
+            $table->timestamps();
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('users');
+    }
+}
+\end{lstlisting}
+
+Potreban je i model \textbf{User}, no ovaj put se ne nasljeđuje klasa \textit{Model} već klasa \textit{Authenticatable}.
+Ta klasa sadrži određene metode potrebne za autoriziranje korisnika pa radni okvir pomoću nje zna kako autorizirati korisnika
+i stvoriti sesiju.
+
+\begin{lstlisting}[language=PHP]
+class User extends Authenticatable
+{
+}
+\end{lstlisting}
+
+Radni okvir sadrži korisnu metodu \textbf{Auth::attempt} koja prima jedan parametar tipa polje.
+U polje se postave vrijednosti korisničkog imena i lozinke koje je poslao korisnik i ako su podaci točni, korisnik je autoriziran.
+Ovisno o ishodu metode vraća se prikladna poruka u JSON formatu.
+
+\begin{lstlisting}[language=PHP]
+class LoginAction extends Controller
+{
+    public function __invoke(Request $request): JsonResponse
+    {
+        $username = $request->username;
+        $password = $request->password;
+
+        if (Auth::attempt(['username' => $username, 'password' => $password]) === false) {
+            return response()->json(['message' => 'Korisnicko ime i/ili lozinka su ne ispravni.'], 401);
+        }
+
+        return response()->json(['message' => 'Uspjesna prijava']);
+    }
+}
+\end{lstlisting}
