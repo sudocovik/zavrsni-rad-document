@@ -92,3 +92,54 @@ Potrebno je vanjsko napajanje koje pretvara 220V u 12V\@.
     \includegraphics[scale=0.4]{images/power-supply}
     \caption{Napajanje (Izvor:~\cite{chipoteka-power-supply})}
 \end{figure}
+
+\subsection{Schema komponenti}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{images/component-schema}
+    \caption{Schema komponenti}
+    \label{fig:component-schema}
+\end{figure}
+
+\pagebreak
+
+Na slici~\ref{fig:component-schema} u centru svega nalazi se ESP32 mikrokontroler.
+Pinovi s desne strane mikrokontrolera (19, 23, 18, 5 i 0) potrebni su za komunikaciju s NFC čitačem.
+Sve tri boje LED diode (crvena, zelena i plava) su u upotrebi, a između svake žice i mikrokontrolera nalazi se
+otpornik od 300 oma.
+Magnetski mikroprekidač najjednostavnija je komponenta, a informacije o stanju pruža mikrokontroleru na pinu broj 33.
+Upravljanje bravom se ne izvodi direktno već pomoću releja na pinu broj 13.
+Relej i brava zahtijevaju napajanje i uzemljenje od 12V s \textit{power shield-a}.
+Dovodom struje na \textit{IN} ulaz releja zatvara se strujni krug i propušta se struja na \textit{COM} izlaz koji je
+povezan s pozitivnim polom brave i otključava bravu.
+
+Testiranjem sefa utvrđeno je neočekivano ponašanje.
+Uzastopno otključavanje brave dovodi do nemogućnosti čitanja kartice i podataka s iste.
+Ispitivanjem je utvrđeno da mikrokontroler radi pravilno, dok NFC čitač ne prepoznaje ranije prepoznatu karticu.
+Nema uzorka u pojavljivanju ovakvog ponašanja (npr.\ nakon X uspješnih čitanja ili X minuta dolazi do nepravilnog rada)
+već se događa nasumično.
+
+Brava uvlači klin pomoću elektromagnetske induktivne zavojnice.
+Dovodom struje na zavojnicu električna energija se pretvara u magnetsku i tvori magnetsko polje.
+Odvodom struje s polova brave magnetsko polje se ruši i stvara naponski impuls obrnutog polariteta~\cite{flyback-diode}.
+Elektroni promjene smjer kretanja i, na sreću, samo privremeno poremete rad NFC čitača.
+Nemoguće je spriječiti promjenu smjera kretanja, no moguće je ograničiti kretanje.
+Za to je potrebna takozvana \textit{flyback} dioda koja propušta jedan smjer, a blokira obrnuti smjer kretanja
+~\cite{flyback-diode}.
+Na slici~\ref{fig:component-schema} kod kontakata brave nalazi se \textit{flyback} dioda.
+Na taj način elektroni s obratnim smjerom kretanja ne dolaze do ostalih komponenti sefa i NFC čitač radi pravilno.
+
+\pagebreak
+
+\subsection{Integracija komponenti u sef}
+
+Mikrokontroler, \textit{power shield}, relej, \textit{flyback} dioda i ožičenje zalemljeni su na plastičnu pločicu,
+a pločica je pričvršćena za kutiju.
+NFC čitač, brava i utor za bravu, mikroprekidač i RGB LED dioda direktno su pričvršćeni za kutiju.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{images/integrated-components}
+    \caption{Schema komponenti}
+\end{figure}
