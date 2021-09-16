@@ -1,3 +1,38 @@
 \chapter{Zaključak}
 
-\ldots
+Ovaj rad je praktična izrada digitaliziranog sustava kontrole pristupa upotrebnom kreditnih kartica bez narušavanja
+privatnosti korisnika - osobni podaci ne dolaze u doticaj sa sustavom.
+Upotrebom web platforme, modernih programskih jezika, radnih okvira, biblioteka i oblaka razvijena je aplikacija
+za kontrolu pristupa koja omogućava administratorima sustava definiranje popisa kreditnih kartica koje imaju pristup sefu.
+Sef se sastoji od nekoliko elektroničkih komponenti i upravljačkog softvera koji koristi web aplikaciju pri
+donošenju odluke treba li sef otključati ili ne.
+
+Implementacijom sustava moguće je odgovoriti na pitanja postavljena u uvodnom djelu rada:
+
+\begin{itemize}
+    \item Je li kontrolor prisutan?
+
+    S obzirom da su komponente integrirane u sef, da, kontrolor je prisutan.
+
+    \item Jesu li uvjeti stvarno ispunjeni (zloupotreba ovlasti ili ljudska greška)?
+
+    Pod pretpostavkom da je administrator definirao kartice korisnika koji smiju pristupiti sefu, da,
+    uspješna autorizacija podrazumijeva pravilno ispunjene uvjete.
+
+    \item Jesu li podaci korisnika ispravni (npr.\ ime i prezime)?
+
+    Podaci o korisnicima sustavu nisu dostupni tako da, ne, ispravnost podataka nije moguće utvrditi.
+
+    \item Jesu li meta podaci ispravni (npr.\ datum i vrijeme)?
+
+    Pod pretpostavkom da nema vanjskog utjecaja (npr.\ greška u javnom NTP serveru, pokvaren interni sat računala), da,
+    meta podaci su ispravni.
+\end{itemize}
+
+Drugi i četvrti stavak treba uzeti sa zadrškom jer se baziraju na pretpostavkama.
+Osim navedenih pretpostavki, također je pretpostavka da programer nije napravio logičke greške tijekom razvoja.
+Računalne programe nije moguće dokazati, ali ih je moguće promatrati i testirati.
+Pravovaljanim automatiziranim testiranjem i promatranjem (eng. \textit{automated testing and observability}) podiže se
+pouzdanost pravilnoga rada sustava.
+Navedeni problemi ne bi trebali biti razlog odbacivanja digitaliziranog sustava kontrole pristupa jer
+pravilnim dizajniranjem i testiranjem nadmašuje ručni sustav kontrole pristupa.
