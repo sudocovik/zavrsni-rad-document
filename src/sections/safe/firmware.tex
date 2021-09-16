@@ -284,3 +284,34 @@ BoxAuthorizer::Result BoxAuthorizer::authorize(const String &uid) {
                                   : authorizationFailed();
 }
 \end{lstlisting}
+
+\subsection{Otključavanje sefa}
+
+Uspješnom autorizacijom izvršavanje programa se nastavlja u funkciji \textit{grantAccess}.
+Dupli bljesak zelene boje je indikator korisniku da je autorizacija uspješna i sef se otključava na četiri sekunde.
+
+\begin{lstlisting}[language=C++]
+void grantAccess() {
+    Serial.println("Successful authorization! Opening the box...");
+
+    LED.flashGreen(2);
+
+    box.unlock();
+    delay(4000);
+    box.lock();
+}
+\end{lstlisting}
+
+Metode za otključavanje i zaključavanje sefa definirane su u \textit{Box} klasi na način da pin koji je spojen na relej
+postave na \textbf{HIGH} ili \textbf{LOW}.
+Mikrokontroler propušta veću voltažu prilikom otključavanja, a manju prilikom zaključavanja.
+
+\begin{lstlisting}[language=C++]
+void Box::unlock() const {
+    digitalWrite(_lockPin, HIGH);
+}
+
+void Box::lock() const {
+    digitalWrite(_lockPin, LOW);
+}
+\end{lstlisting}
