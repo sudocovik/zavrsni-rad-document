@@ -97,10 +97,7 @@ void NetworkManager::connect(void (*onSuccess)()) const {
 }
 \end{lstlisting}
 
-\begin{wrapfigure}{r}{0.4\textwidth}
-    \includegraphics[scale=0.3]{images/wifi-access-point}
-    \caption{Portal za odabir mreže (Izvor:~\cite{wifi-manager})}
-\end{wrapfigure}
+\clearpage
 
 Ukoliko je dostupna mreža na koju se mikrokontroler povezao u prošlosti automatski se povezuje na nju.
 U suprotnom mikrokontroler se ponaša kao pristupna točka (eng. \textit{access point}) i zahtjeva manualan odabir
@@ -109,7 +106,12 @@ Pomoću drugog uređaja (npr.~\textit{smartphone}) potrebno je povezati se na mr
 lozinkom \textit{ACCESS\_POINT\_PASSWORD}, a potom se otvara portal kroz koji se konfigurira mreža na koju će se
 mikrokontroler povezivati ubuduće.
 
-\clearpage
+\begin{figure}[h!]
+    \centering
+    \includegraphics[scale=0.3]{images/wifi-access-point}
+    \caption{Portal za odabir mreže (Izvor:~\cite{wifi-manager})}
+\end{figure}
+
 
 \subsection{Čitanje kartice}
 
