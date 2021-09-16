@@ -195,3 +195,92 @@ String Card::toUid() const {
     return UID;
 }
 \end{lstlisting}
+
+\subsection{Autorizacija pristupa}
+
+Uspješnim čitanjem kartice izvršavanje programa se nastavlja u funkciji \textit{tryToAuthorizeAccess}.
+
+\begin{lstlisting}[language=C++]
+void tryToAuthorizeAccess(const Card& card) {
+    Serial.println("--------------------------------------------------");
+    Serial.println("Detected new card with UID: " + card.toUid());
+
+    LED.flashGreen(1);
+    delay(1000);
+    LED.idle();
+
+    if (box.isOpened()) {
+        Serial.println("Box is opened, skipping...");
+        LED.flashRed(1);
+        return;
+    }
+
+    Serial.println("Box is closed, authorizing card with the server...");
+
+    box.authorize(card)
+       .onSuccess(grantAccess)
+       .onFailure(notifyForbiddenAccess);
+}
+\end{lstlisting}
+
+Jednim zelenim bljeskom LED diode korisniku se ukazuje na uspješno čitanje kartice.
+Sljedeći je korak utvrditi je li kutija već otvorena (pomoću magnetskog mikroprekidača), ako je potrebno je jednim
+crvenim bljeskom informirati korisnika, a izvršavanje obustaviti.
+
+\begin{lstlisting}[language=C++]
+bool Box::isOpened() const {
+    return digitalRead(_statePin);
+}
+\end{lstlisting}
+
+Zatvorena kutija je uvjet za slanje autorizacijskog zahtjeva na udaljeni server.
+
+Slanje zahtjeva je izvedeno u pomoćnoj klasi \textit{POST} koja apstrahira rad s bibliotekama \textit{HTTPClient} i
+\textit{WiFiClient}.
+Klasa ne zna unaprijed gdje se server nalazi, koji podaci će se poslati i sl.\ već zna \textbf{kako} poslati zahtjev.
+
+\begin{lstlisting}[language=C++]
+POST::POST(): _wifiClient(), _httpClient() {
+}
+
+POST::~POST() {
+    _httpClient.end();
+}
+
+POST POST::request() {
+    return {};
+}
+
+POST& POST::to(const String& url) {
+    _httpClient.begin(_wifiClient, url);
+    _httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    return *this;
+}
+
+POST& POST::withPayload(const String& payload) {
+    _payload = payload;
+
+    return *this;
+}
+
+uint8_t POST::responseCode() {
+    return _httpClient.POST(_payload);
+}
+\end{lstlisting}
+
+Metode \textit{POST} klase su iskorištene u metodi \textit{BoxAuthorizer::authorize}.
+Ova metoda ne zna kako poslati zahtjev ali zna \textbf{gdje} i \textbf{koje} podatke treba poslati.
+Prosljeđuje se URL adresa udaljenog servera i UID\@.
+Ukoliko je HTTP kod odgovara jednak 200 autorizacija je uspješna.
+
+\begin{lstlisting}[language=C++]
+BoxAuthorizer::Result BoxAuthorizer::authorize(const String &uid) {
+    return POST::request()
+                 .to("http://144.126.244.106/api/box/authorize")
+                 .withPayload("uid=" + uid)
+                 .responseCode() == 200
+                                  ? authorizationSucceeded()
+                                  : authorizationFailed();
+}
+\end{lstlisting}
