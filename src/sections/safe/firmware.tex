@@ -109,3 +109,89 @@ Pomoću drugog uređaja (npr.~\textit{smartphone}) potrebno je povezati se na mr
 lozinkom \textit{ACCESS\_POINT\_PASSWORD}, a potom se otvara portal kroz koji se konfigurira mreža na koju će se
 mikrokontroler povezivati ubuduće.
 
+\clearpage
+
+\subsection{Čitanje kartice}
+
+Nakon uspješne konfiguracije bežične veze funkcija \textit{setup} završava te započinje konstantno izvršavanje funkcije
+\textit{loop}.
+
+\begin{lstlisting}[language=C++]
+void loop() {
+    reader.tryReadingTheCard();
+    delay(1000);
+}
+\end{lstlisting}
+
+Metoda \textit{tryReadingTheCard} provjerava je li kartica prislonjena blizu čitača i pokušava pročitati UID\@.
+Ovisno o uspješnosti čitanja UID-a izvršava \textit{callback-ove} definirane u \textit{setup} funkciji.
+Biblioteka \textit{MFRC522} olakšava rad s NFC čitačem i instancirana je u konstruktoru klase.
+
+\begin{lstlisting}[language=C++]
+CardReader::CardReader(byte chipSelectPin, byte resetPowerDownPin) {
+    reader = MFRC522(chipSelectPin, resetPowerDownPin);
+}
+
+void CardReader::tryReadingTheCard() {
+    if (reader.PICC_IsNewCardPresent() == false)
+        return;
+
+    if (reader.PICC_ReadCardSerial() == false) {
+        failedAttemptCallback();
+        anyAttemptCallback();
+        return;
+    }
+
+    Card card = Card(reader.uid);
+
+    reader.PICC_HaltA();
+    reader.PCD_StopCrypto1();
+
+    if (card.isUidValid()) {
+        successfulAttemptCallback(card);
+    }
+    else {
+        failedAttemptCallback();
+    }
+
+    anyAttemptCallback();
+}
+\end{lstlisting}
+
+Instancira se objekt \textit{Card} koji se prosljeđuje \textit{callback-u} uspješnog čitanja.
+Konstruktor prima jedan argument tipa \textit{MFRC522::Uid} i pretvara ga u \textit{String}.
+Klasa pruža metode za provjeru valjanosti UID-a (\textit{isUidValid}) kao i pretvaranje cijelog objekta \textit{Card} u
+\textit{UID String} (\textit{toUid}).
+
+\begin{lstlisting}[language=C++]
+Card::Card(MFRC522::Uid uid) {
+    UID = uidToHexString(uid);
+}
+
+String Card::uidToHexString(MFRC522::Uid uid) {
+    if (uid.size == 0) return "";
+
+    String hexString = "";
+
+    for(unsigned short int i = 0; i < uid.size; i++) {
+        const char prefix = uid.uidByte[i] < 10 ? '0' : '\0';
+
+        String byteAsHexString = prefix + String(uid.uidByte[i], HEX);
+        hexString += byteAsHexString + " ";
+    }
+
+    hexString.trim();
+    hexString.toUpperCase();
+    hexString.replace(' ', '-');
+
+    return hexString;
+}
+
+bool Card::isUidValid() {
+    return UID.isEmpty() == false;
+}
+
+String Card::toUid() const {
+    return UID;
+}
+\end{lstlisting}
